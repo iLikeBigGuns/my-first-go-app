@@ -1,11 +1,17 @@
 package main
 
 import (
+	"encoding/json" // Пакет для работы с JSON
 	"fmt"
 	"math/rand"
 	"net/http"
-	"strconv"
 )
+
+// Описываем структуру входящих данных
+type CalcRequest struct {
+	A int `json:"a"`
+	B int `json:"b"`
+}
 
 func setupRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
@@ -18,58 +24,59 @@ func setupRoutes() *http.ServeMux {
 	// GET: Эндпоинт /hello
 	mux.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Привет! Ты вызвал эндпоинт Hello.")
-	})
-
-	// POST: Эндпоинт /calculate
-	mux.HandleFunc("/calculate", func(w http.ResponseWriter, r *http.Request) {
-		// 1. Проверяем, что это POST запрос
-		if r.Method != http.MethodPost {
-			http.Error(w, "Используйте POST запрос", http.StatusMethodNotAllowed)
-			return
-		}
-
-		// 2. Получаем числа из параметров URL
-		val1 := r.URL.Query().Get("a")
-		val2 := r.URL.Query().Get("b")
-
-		// 3. Конвертируем текст в целые числа
-		a, err1 := strconv.Atoi(val1)
-		b, err2 := strconv.Atoi(val2)
-
-		if err1 != nil || err2 != nil {
-			fmt.Fprintln(w, "Ошибка: укажите целые числа в параметрах a и b")
-			return
-		}
-
-		// 4. Случайное действие
-		actions := []string{"сложение", "умножение", "деление", "вычитание"}
-		action := actions[rand.Intn(len(actions))]
-		var result float64
-
-		switch action {
-		case "сложение":
-			result = float64(a + b)
-		case "вычитание":
-			result = float64(a - b)	
-		case "умножение":
-			result = float64(a * b)
-		case "деление":
-			if b == 0 {
-				fmt.Fprintln(w, "На ноль делить нельзя")
-				return
-			}
-			result = float64(a) / float64(b)
-		}
-
-		fmt.Fprintf(w, "Действие: %s. Результат: %.2f\n", action, result)
-	})
+	})	
+	
+	// POST: Связываем путь с функцией calculateHandler
+	mux.HandleFunc("/calculate", calculateHandler)
 
 	return mux
 }
 
+// POST: Эндпоинт /calculate
+func calculateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Используйте POST запрос", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 1. Создаем переменную типа нашей структуры
+	var req CalcRequest
+
+	// 2. Читаем JSON из тела запроса и записываем в переменную req
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "Ошибка: неверный формат JSON", http.StatusBadRequest)
+		return
+	}
+
+	// 3. Используем данные из структуры (теперь это уже числа, а не строки!)
+	a := req.A
+	b := req.B
+
+	actions := []string{"сложение", "умножение", "деление", "вычитание"}
+	action := actions[rand.Intn(len(actions))]
+	var result float64
+
+	switch action {
+	case "сложение":
+		result = float64(a + b)
+	case "вычитание":
+		result = float64(a - b)
+	case "умножение":
+		result = float64(a * b)
+	case "деление":
+		if b == 0 {
+			fmt.Fprintln(w, "На ноль делить нельзя")
+			return
+		}
+		result = float64(a) / float64(b)
+	}
+
+	fmt.Fprintf(w, "Действие: %s. Результат: %.2f\n", action, result)
+}
+
 func main() {
 	router := setupRoutes()
-	fmt.Println("Сервер запущен. POST эндпоинт: http://localhost:8080/calculate?a=10&b=5")
-
+	fmt.Println("Сервер запущен. Ожидаю JSON на http://localhost:8080/calculate")
 	http.ListenAndServe(":8080", router)
 }
