@@ -5,17 +5,34 @@ import (
 	"net/http"
 )
 
-func main() {
-	// Регистрируем эндпоинт "/" и функцию-обработчик
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Привет! Это твой первый HTTP сервер на Go.")
+// setupRoutes теперь содержит несколько эндпоинтов
+func setupRoutes() *http.ServeMux {
+	mux := http.NewServeMux()
+
+	// Главная страница
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Добро пожаловать на главную страницу!")
 	})
 
-	fmt.Println("Сервер запущен на http://localhost:8080")
-	
-	// Запускаем сервер на порту 8080
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		fmt.Println("Ошибка запуска:", err)
-	}
+	// Эндпоинт /hello
+	mux.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Привет! Ты вызвал эндпоинт Hello.")
+	})
+
+	// Эндпоинт /about
+	mux.HandleFunc("/about", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "Это сервер на Go. Версия 1.0")
+	})
+
+	return mux
+}
+
+func main() {
+	router := setupRoutes()
+	fmt.Println("Сервер запущен. Проверь адреса:")
+	fmt.Println("http://localhost:8080/")
+	fmt.Println("http://localhost:8080/hello")
+	fmt.Println("http://localhost:8080/about")
+
+	http.ListenAndServe(":8080", router)
 }
