@@ -1,7 +1,21 @@
-package main // Каждый файл должен принадлежать какому-то пакету
+package main
 
-import "fmt" // Импорт библиотеки для ввода-вывода текста
+import (
+	"fmt"
+	"net/http"
+)
 
 func main() {
-    fmt.Println("Привет, Go-разработчик!") 
+	// Регистрируем эндпоинт "/" и функцию-обработчик
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Привет! Это твой первый HTTP сервер на Go.")
+	})
+
+	fmt.Println("Сервер запущен на http://localhost:8080")
+	
+	// Запускаем сервер на порту 8080
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		fmt.Println("Ошибка запуска:", err)
+	}
 }
