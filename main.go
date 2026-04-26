@@ -7,12 +7,6 @@ import (
 	"net/http"
 )
 
-// Описываем структуру входящих данных
-type CalcRequest struct {
-	A int `json:"a"`
-	B int `json:"b"`
-}
-
 func setupRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
 
@@ -32,27 +26,19 @@ func setupRoutes() *http.ServeMux {
 	return mux
 }
 
-// POST: Эндпоинт /calculate
-func calculateHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Используйте POST запрос", http.StatusMethodNotAllowed)
-		return
-	}
+// Структуры данных
+type CalcRequest struct {
+	A int `json:"a"`
+	B int `json:"b"`
+}
 
-	// 1. Создаем переменную типа нашей структуры
-	var req CalcRequest
+type CalcResponse struct {
+	Action string  `json:"action"`
+	Result float64 `json:"result"`
+}
 
-	// 2. Читаем JSON из тела запроса и записываем в переменную req
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, "Ошибка: неверный формат JSON", http.StatusBadRequest)
-		return
-	}
-
-	// 3. Используем данные из структуры (теперь это уже числа, а не строки!)
-	a := req.A
-	b := req.B
-
+// --- ЛОГИКА ВЫЧИСЛЕНИЙ (Вынесена отдельно) ---
+func performCalculation(a, b int) (string, float64, error) {
 	actions := []string{"сложение", "умножение", "деление", "вычитание"}
 	action := actions[rand.Intn(len(actions))]
 	var result float64
@@ -66,17 +52,50 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		result = float64(a * b)
 	case "деление":
 		if b == 0 {
-			fmt.Fprintln(w, "На ноль делить нельзя")
-			return
+			return action, 0, fmt.Errorf("деление на ноль")
 		}
 		result = float64(a) / float64(b)
 	}
 
-	fmt.Fprintf(w, "Действие: %s. Результат: %.2f\n", action, result)
+	return action, result, nil
+}
+
+// --- ОБРАБОТЧИК ЗАПРОСА ---
+func calculateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Нужен POST запрос", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req CalcRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Ошибка в JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Вызываем функцию вычислений
+	action, result, err := performCalculation(req.A, req.B)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	resp := CalcResponse{
+		Action: action,
+		Result: result,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func setupRoutes() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/calculate", calculateHandler)
+	return mux
 }
 
 func main() {
-	router := setupRoutes()
-	fmt.Println("Сервер запущен. Ожидаю JSON на http://localhost:8080/calculate")
-	http.ListenAndServe(":8080", router)
+	fmt.Println("Сервер запущен на http://localhost:8080")
+	http.ListenAndServe(":8080", setupRoutes())
 }
