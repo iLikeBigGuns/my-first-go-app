@@ -1,32 +1,30 @@
 package main
 
 import (
-	"encoding/json" // Пакет для работы с JSON
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
 )
 
-func setupRoutes() *http.ServeMux {
-	mux := http.NewServeMux()
-
-	// GET: Главная страница
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "Добро пожаловать на главную страницу!")
-	})
-
-	// GET: Эндпоинт /hello
-	mux.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "Привет! Ты вызвал эндпоинт Hello.")
-	})	
-	
-	// POST: Связываем путь с функцией calculateHandler
-	mux.HandleFunc("/calculate", calculateHandler)
-
-	return mux
+// Calculator — структура, которая будет содержать наши числа и методы
+type Calculator struct {
+	A int
+	B int
 }
 
-// Структуры данных
+// Методы для каждого типа вычисления
+func (c Calculator) Add() float64      { return float64(c.A + c.B) }
+func (c Calculator) Subtract() float64 { return float64(c.A - c.B) }
+func (c Calculator) Multiply() float64 { return float64(c.A * c.B) }
+func (c Calculator) Divide() (float64, error) {
+	if c.B == 0 {
+		return 0, fmt.Errorf("деление на ноль")
+	}
+	return float64(c.A) / float64(c.B), nil
+}
+
+// Структуры для JSON
 type CalcRequest struct {
 	A int `json:"a"`
 	B int `json:"b"`
@@ -37,30 +35,32 @@ type CalcResponse struct {
 	Result float64 `json:"result"`
 }
 
-// --- ЛОГИКА ВЫЧИСЛЕНИЙ (Вынесена отдельно) ---
+// --- ЛОГИКА ВЫБОРА МЕТОДА ---
 func performCalculation(a, b int) (string, float64, error) {
-	actions := []string{"сложение", "умножение", "деление", "вычитание"}
+	calc := Calculator{A: a, B: b}
+	
+	actions := []string{"сложение", "вычитание", "умножение", "деление"}
 	action := actions[rand.Intn(len(actions))]
+	
 	var result float64
+	var err error
 
+	// Вызываем конкретный метод в зависимости от выбранного действия
 	switch action {
 	case "сложение":
-		result = float64(a + b)
+		result = calc.Add()
 	case "вычитание":
-		result = float64(a - b)
+		result = calc.Subtract()
 	case "умножение":
-		result = float64(a * b)
+		result = calc.Multiply()
 	case "деление":
-		if b == 0 {
-			return action, 0, fmt.Errorf("деление на ноль")
-		}
-		result = float64(a) / float64(b)
+		result, err = calc.Divide()
 	}
 
-	return action, result, nil
+	return action, result, err
 }
 
-// --- ОБРАБОТЧИК ЗАПРОСА ---
+// --- ОБРАБОТЧИК ---
 func calculateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Нужен POST запрос", http.StatusMethodNotAllowed)
@@ -73,20 +73,17 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Вызываем функцию вычислений
 	action, result, err := performCalculation(req.A, req.B)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	resp := CalcResponse{
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(CalcResponse{
 		Action: action,
 		Result: result,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	})
 }
 
 func setupRoutes() *http.ServeMux {
