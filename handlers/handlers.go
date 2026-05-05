@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func calculateHandler(w http.ResponseWriter, r *http.Request) {
+func CalculateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Нужен POST запрос", http.StatusMethodNotAllowed)
 		return
@@ -25,10 +25,14 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	switch action {
-	case "сложение": result = req.Add()
-	case "вычитание": result = req.Subtract()
-	case "умножение": result = req.Multiply()
-	case "деление": result, err = req.Divide()
+	case "сложение":
+		result = req.Add()
+	case "вычитание":
+		result = req.Subtract()
+	case "умножение":
+		result = req.Multiply()
+	case "деление":
+		result, err = req.Divide()
 	}
 
 	if err != nil {
@@ -40,8 +44,9 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(CalcResponse{Action: action, Result: result})
 }
 
-func setupRoutes() *http.ServeMux {
+func SetupRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/calculate", calculateHandler)
+	mux.HandleFunc("/calculate", CalculateHandler)
+	mux.HandleFunc("/log", FileHandler) // Новый хэндлер
 	return mux
 }
